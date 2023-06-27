@@ -1,7 +1,7 @@
-from fastapi import FastAPI, Body
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Body, Path, Query
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 
 app = FastAPI()
 app.title = "Mi aplicacion con FastAPI"
@@ -14,8 +14,8 @@ class Movie(BaseModel):
     title: str = Field(min_length=5, max_length=15)
     overview: str = Field(min_length=15, max_length=50)
     year: int = Field(le=2023)
-    rating: float
-    category: str
+    rating: float = Field(ge=1, le=10)
+    category: str = Field(min_length=5, max_length=15)
 
     class Config:
         schema_extra = {
@@ -53,24 +53,23 @@ movies = [
 def message():
     return HTMLResponse('<h1>Hello World</h1>')
 
-@app.get('/movies', tags=['Movies'])
-def get_movies():
-    return movies
+@app.get('/movies', tags=['Movies'], response_model=List[Movie], status_code=200)
+def get_movies() -> List[Movie]:
+    return JSONResponse(status_code=200, content=movies)
 
-@app.get('/movies/{id}', tags=['Movies by Id'])
-def get_movies_by_id(id: int):  ##Se solicita el id (entero) como variable obligatoria
+@app.get('/movies/{id}', tags=['Movies by Id'], response_model=Movie)
+def get_movies_by_id(id: int = Path(ge=1, le=2000)) -> Movie:  ##Se solicita el id (entero) como variable obligatoria
     for item in movies:
         if item["id"] == id:
-            return item
-    return []
+            return JSONResponse(content=item)
+    return JSONResponse(status_code=404, content=[])
 
-
-@app.get('/movies/', tags=['Movis by Category']) ##Por Parametro Query
-def get_movies_by_category(category: str, year: str):   #En este caso se filtra por categoria y por año, ambas obligatorias
+@app.get('/movies/', tags=['Movis by Category and Year'], response_model=List[Movie]) ##Por Parametro Query
+def get_movies_by_category(category: str = Query(min_length=3, max_length=15), year: str = Query(min_length=1, max_length=5)) -> List[Movie]:   #En este caso se filtra por categoria y por año, ambas obligatorias
     #return [ item for item in movies if item['category'] == category ]  ##Using list comprhensions
     for item in movies:
         if (item["category"] == category) & (item["year"] == year):
-            return item
+            return JSONResponse(content=item)
     return "No hay pelis de este tipo"
 
 """@app.post('/movies', tags=['Create Movies'])    #Se solicitan todos los datos como body request, de esta forma se actualiza el diccionario de pelis:
@@ -86,10 +85,10 @@ def create_movies(id: int = Body(), title: str = Body(), overview: str = Body(),
     return movies"""
     
     #Al tener la clase Movie creada, el constructor nos ahorra lineas de codigo:
-@app.post('/movies', tags=['Create Movies'])   
-def create_movies(movie: Movie): #Ahora los datos vienen del constructor Movie.
+@app.post('/movies', tags=['Create Movies'], response_model=dict, status_code=201)   
+def create_movies(movie: Movie) -> dict: #Ahora los datos vienen del constructor Movie.
     movies.append(movie.dict()) #Como ahora se estan es añadiendo objetos de tipo Movie, se debe convertir a dict().
-    return movies
+    return JSONResponse(status_code=201, content={"message": "Se ha registrado la pelicula exitosamente."})
 
 """@app.put('/movies/{id}', tags=['Update Movies'])    #En pro de identificar solo una peli por el id, este se solicita de manera obligatoria, el resto de informacion se pasa por el body.
 def update_movies(id: int, title: str = Body(), overview: str = Body(), year: int = Body(), rating: float = Body(), category: str = Body()):
@@ -104,8 +103,8 @@ def update_movies(id: int, title: str = Body(), overview: str = Body(), year: in
         """
 
 #Para el caso del put, se modifica igualmente teniendo en cuenta el constructor Movie, pero el id al ser obligatorio, no se elimina de las variables solicitadas:
-@app.put('/movies/{id}', tags=['Update Movies'])    #En pro de identificar solo una peli por el id, este se solicita de manera obligatoria, el resto de informacion se pasa por el body usando el constructor:
-def update_movies(id: int, movie: Movie):
+@app.put('/movies/{id}', tags=['Update Movies'], response_model=dict, status_code=200)    #En pro de identificar solo una peli por el id, este se solicita de manera obligatoria, el resto de informacion se pasa por el body usando el constructor:
+def update_movies(id: int, movie: Movie) -> dict:
     for item in movies:
         if item["id"] == id:
             item["title"] = movie.title
@@ -113,13 +112,13 @@ def update_movies(id: int, movie: Movie):
             item["year"] = movie.year
             item["rating"] = movie.rating
             item["category"] = movie.category
-            return movies
+            return JSONResponse(status_code=200, content={"message": "Se ha modificado la pelicula exitosamente."})
         
 
-@app.delete('/movies/{id}', tags=['Delete Movies by Id'])
-def delete_movies(id: int):
+@app.delete('/movies/{id}', tags=['Delete Movies by Id'], response_model=dict, status_code=200)
+def delete_movies(id: int) -> dict:
     for item in movies:
         if item["id"] == id:
             movies.remove(item)
-            return movies
+            return JSONResponse(status_code=200, content={"message": "Se ha eliminado la pelicula exitosamente."})
     return "No hay pelis con este Id"
