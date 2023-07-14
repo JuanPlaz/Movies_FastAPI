@@ -10,7 +10,7 @@ from jwt_manager import create_token, validate_token
 from fastapi.security import HTTPBearer
 
 from config.database import Session, engine, Base
-from models.movie import Movie
+from models.movie import Movie as MovieModel
 
 app = FastAPI()
 app.title = "Mi aplicacion con FastAPI"
@@ -114,7 +114,15 @@ def create_movies(id: int = Body(), title: str = Body(), overview: str = Body(),
     #Al tener la clase Movie creada, el constructor nos ahorra lineas de codigo:
 @app.post('/movies', tags=['Movies'], response_model=dict, status_code=201)   
 def create_movies(movie: Movie) -> dict: #Ahora los datos vienen del constructor Movie.
-    movies.append(movie.dict()) #Como ahora se estan es añadiendo objetos de tipo Movie, se debe convertir a dict().
+   
+    db = Session()
+    #MovieModel(title=movie.title, overview=movie.overview, year=movie.year) #Primera forma de extraer los parametros 
+    new_movie= MovieModel(**movie.dict())  #Se trae movie como dict y se extraen los atributos y se pasan como parametro usando **
+    db.add(new_movie)   #Se agrega la nueva pelicula a la base de datos
+    db.commit()     #Se actualiza/recarga la base de datos
+    
+    #La siguiente linea se suspende, pues ya se está creando la nueva pelicula y se está agregando a la db.
+    #movies.append(movie.dict()) #Como ahora se estan es añadiendo objetos de tipo Movie, se debe convertir a dict().
     return JSONResponse(status_code=201, content={"message": "Se ha registrado la pelicula exitosamente."})
 
 """@app.put('/movies/{id}', tags=['Update Movies'])    #En pro de identificar solo una peli por el id, este se solicita de manera obligatoria, el resto de informacion se pasa por el body.
