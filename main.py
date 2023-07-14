@@ -9,9 +9,14 @@ from starlette.requests import Request
 from jwt_manager import create_token, validate_token
 from fastapi.security import HTTPBearer
 
+from config.database import Session, engine, Base
+from models.movie import Movie
+
 app = FastAPI()
 app.title = "Mi aplicacion con FastAPI"
-app.version = "0.0.1"
+app.version = "0.0.2"
+
+Base.metadata.create_all(bind= engine)
 
 class JWTBearer(HTTPBearer):    #Funcion que sirve para acceder a la peticion del usuario
     async def __call__(self, request: Request): #Se define como funcion asyncrona debido a que tarda un tiempo en responder. 
