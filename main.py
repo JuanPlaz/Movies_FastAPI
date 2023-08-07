@@ -7,25 +7,22 @@ from typing import Optional, List
 from starlette.requests import Request
 
 from jwt_manager import create_token, validate_token
-from fastapi.security import HTTPBearer
 
 from config.database import Session, engine, Base
 from models.movie import Movie as MovieModel
 from fastapi.encoders import jsonable_encoder
 
+from middlewares.error_handler import Error_Handler
+from middlewares.jwt_bearer import JWTBearer
+
 app = FastAPI()
 app.title = "Mi aplicacion con FastAPI"
-app.version = "0.0.2"
+app.version = "0.0.3"
+
+app.add_middleware(Error_Handler)   #Se linkea el error handler creado anteriormente.
 
 Base.metadata.create_all(bind= engine)
 
-class JWTBearer(HTTPBearer):    #Funcion que sirve para acceder a la peticion del usuario
-    async def __call__(self, request: Request): #Se define como funcion asyncrona debido a que tarda un tiempo en responder. 
-        auth = await super().__call__(request)  #Devolverá el token
-        data = validate_token(auth.credentials) #Se llama la funcion de validacion
-        if data['email'] != "admin@gmail.com":  #Se compara la data y se eleva una excepción
-            raise HTTPException(status_code=403, detail="Invalid Credentials")
-       
 class User(BaseModel):
     email: str
     password: str
