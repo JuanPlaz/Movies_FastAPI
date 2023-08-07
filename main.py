@@ -11,6 +11,7 @@ from fastapi.security import HTTPBearer
 
 from config.database import Session, engine, Base
 from models.movie import Movie as MovieModel
+from fastapi.encoders import jsonable_encoder
 
 app = FastAPI()
 app.title = "Mi aplicacion con FastAPI"
@@ -82,22 +83,42 @@ def login(user: User):
 
 @app.get('/movies', tags=['Movies'], response_model=List[Movie], status_code=200, dependencies=[Depends(JWTBearer())])
 def get_movies() -> List[Movie]:
-    return JSONResponse(status_code=200, content=movies)
+    db = Session()
+    result = db.query(MovieModel).all()
+
+    return JSONResponse(status_code=200, content=jsonable_encoder(result))
 
 @app.get('/movies/{id}', tags=['Movies'], response_model=Movie)
 def get_movies_by_id(id: int = Path(ge=1, le=2000)) -> Movie:  ##Se solicita el id (entero) como variable obligatoria
+    db = Session()
+    result = db.query(MovieModel).filter(MovieModel.id == id).first()
+    
+    if not result:
+        return JSONResponse(status_code=404, content={'message': "No encontrado"})
+    return JSONResponse(status_code=200, content=jsonable_encoder(result))
+
+"""                         #Se omite el ciclo For al usar el metodo filter
     for item in movies:
         if item["id"] == id:
             return JSONResponse(content=item)
     return JSONResponse(status_code=404, content=[])
-
+"""
 @app.get('/movies/', tags=['Movies'], response_model=List[Movie]) ##Por Parametro Query
 def get_movies_by_category(category: str = Query(min_length=3, max_length=15), year: str = Query(min_length=1, max_length=5)) -> List[Movie]:   #En este caso se filtra por categoria y por año, ambas obligatorias
     #return [ item for item in movies if item['category'] == category ]  ##Using list comprhensions
+    db = Session()
+    result = db.query(MovieModel).filter(MovieModel.category == category and MovieModel.year == year).all()
+
+    if not result:
+        return JSONResponse(status_code=404, content={'message': "No encontrado"})
+    return JSONResponse(status_code=200, content=jsonable_encoder(result))
+
+""" #Se omite el ciclo For al usar el metodo filter
     for item in movies:
         if (item["category"] == category) and (item["year"] == year):
             return JSONResponse(content=item)
     return "No hay pelis de este tipo"
+    """
 
 """@app.post('/movies', tags=['Create Movies'])    #Se solicitan todos los datos como body request, de esta forma se actualiza el diccionario de pelis:
 def create_movies(id: int = Body(), title: str = Body(), overview: str = Body(), year: int = Body(), rating: float = Body(), category: str = Body()):
@@ -140,20 +161,46 @@ def update_movies(id: int, title: str = Body(), overview: str = Body(), year: in
 #Para el caso del put, se modifica igualmente teniendo en cuenta el constructor Movie, pero el id al ser obligatorio, no se elimina de las variables solicitadas:
 @app.put('/movies/{id}', tags=['Movies'], response_model=dict, status_code=200)    #En pro de identificar solo una peli por el id, este se solicita de manera obligatoria, el resto de informacion se pasa por el body usando el constructor:
 def update_movies(id: int, movie: Movie) -> dict:
-    for item in movies:
+    db = Session()
+    result = db.query(MovieModel).filter(MovieModel.id == id).first()
+    if not result:
+        return JSONResponse(status_code=404, content={'message': "No encontrado"})
+    
+    result.title = movie.title
+    result.overview = movie.overview
+    result.year = movie.year
+    result.rating = movie.rating
+    result.category = movie.category
+    db.commit()
+
+    return JSONResponse(status_code=200, content={"message": "Se ha modificado la pelicula exitosamente."})
+
+"""for item in movies:  ##Ya no es necesario actualizar los iten en ciclo, se actualizan usando como se ve previamente.
         if item["id"] == id:
             item["title"] = movie.title
             item["overview"] = movie.overview
             item["year"] = movie.year
             item["rating"] = movie.rating
-            item["category"] = movie.category
-            return JSONResponse(status_code=200, content={"message": "Se ha modificado la pelicula exitosamente."})
+            item["category"] = movie.category """
         
 
 @app.delete('/movies/{id}', tags=['Movies'], response_model=dict, status_code=200)
 def delete_movies(id: int) -> dict:
+
+    db = Session()
+    result = db.query(MovieModel).filter(MovieModel.id == id).first() #Se verifica que el resultado buscado exista.
+    if not result:
+        return JSONResponse(status_code=404, content={'message': "No encontrado"})
+    
+    db.delete(result)   #Con el metodo delete se haya el resultado y se elimina
+    db.commit()
+    return JSONResponse(status_code=200, content={"message": "Se ha eliminado la pelicula exitosamente."}) 
+
+"""
     for item in movies:
         if item["id"] == id:
             movies.remove(item)
-            return JSONResponse(status_code=200, content={"message": "Se ha eliminado la pelicula exitosamente."})
-    return "No hay pelis con este Id"
+            return JSONResponse(status_code=200, content={"message": "Se ha eliminado la pelicula exitosamente."}) 
+            
+        return JSONResponse(status_code=404, content={'message': "No encontrado"})"""
+    
