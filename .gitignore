@@ -4,3 +4,5 @@
 
 /models/__pycache__
 /config/__pycache__
+/middlewares/__pycache__
+/routers/__pycache__
