@@ -2,41 +2,17 @@ from fastapi import APIRouter
 from fastapi import Path, Query, Depends
 from fastapi.responses import JSONResponse
 
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import List
 
 from config.database import Session
 from models.movie import Movie as MovieModel
 from fastapi.encoders import jsonable_encoder
-
 from middlewares.jwt_bearer import JWTBearer
-
 from services.movie import MovieService
+from schemas.movie import Movie
 
 movie_router = APIRouter()
 
-
-class Movie(BaseModel):
-    #id: int | None = None   #La variable podria ser de tipo entero, o None porque podria ser una variable opcional.
-    id: Optional[int] = None #Importando "Optional" de la libreria Typing, puedo volver la variable opcional como se observa.
-    #title: str = Field(default="Mi pelicula", min_length=5, max_length=15) #Usando "default" se le puede dar un valor inicial a la variable.
-    title: str = Field(min_length=5, max_length=15)
-    overview: str = Field(min_length=15, max_length=50)
-    year: int = Field(le=2023)
-    rating: float = Field(ge=1, le=10)
-    category: str = Field(min_length=5, max_length=15)
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "id": 1,
-                "title": "Mi pelicula",
-                "overview": "Descripción de la peli",
-                "year": 1999,
-                "rating": 9.9,
-                "category": "Sci-fi"
-            }
-        }
 
 @movie_router.get('/movies', tags=['Movies'], response_model=List[Movie], status_code=200, dependencies=[Depends(JWTBearer())])
 def get_movies() -> List[Movie]:
@@ -93,11 +69,15 @@ def create_movies(id: int = Body(), title: str = Body(), overview: str = Body(),
 def create_movies(movie: Movie) -> dict: #Ahora los datos vienen del constructor Movie.
    
     db = Session()
+    MovieService(db).create_movie(movie)
+    
+    
+    """
     #MovieModel(title=movie.title, overview=movie.overview, year=movie.year) #Primera forma de extraer los parametros 
     new_movie= MovieModel(**movie.dict())  #Se trae movie como dict y se extraen los atributos y se pasan como parametro usando **
     db.add(new_movie)   #Se agrega la nueva pelicula a la base de datos
     db.commit()     #Se actualiza/recarga la base de datos
-    
+    """
     #La siguiente linea se suspende, pues ya se está creando la nueva pelicula y se está agregando a la db.
     #movies.append(movie.dict()) #Como ahora se estan es añadiendo objetos de tipo Movie, se debe convertir a dict().
     return JSONResponse(status_code=201, content={"message": "Se ha registrado la pelicula exitosamente."})
@@ -118,20 +98,24 @@ def update_movies(id: int, title: str = Body(), overview: str = Body(), year: in
 @movie_router.put('/movies/{id}', tags=['Movies'], response_model=dict, status_code=200)    #En pro de identificar solo una peli por el id, este se solicita de manera obligatoria, el resto de informacion se pasa por el body usando el constructor:
 def update_movies(id: int, movie: Movie) -> dict:
     db = Session()
-    result = db.query(MovieModel).filter(MovieModel.id == id).first()
+    result = MovieService(db).get_movie(id)
+    ###result = db.query(MovieModel).filter(MovieModel.id == id).first()
     if not result:
         return JSONResponse(status_code=404, content={'message': "No encontrado"})
-    
+
+    MovieService(db).update_movie(id, movie)       #Para actualizar, se llama al servicio que se crea "MovieService"
+
+    """
     result.title = movie.title
     result.overview = movie.overview
     result.year = movie.year
     result.rating = movie.rating
     result.category = movie.category
     db.commit()
-
+"""
     return JSONResponse(status_code=200, content={"message": "Se ha modificado la pelicula exitosamente."})
 
-"""for item in movies:  ##Ya no es necesario actualizar los iten en ciclo, se actualizan usando como se ve previamente.
+"""for item in movies:  ##Ya no es necesario actualizar los items en ciclo, se actualizan usando como se ve previamente.
         if item["id"] == id:
             item["title"] = movie.title
             item["overview"] = movie.overview
@@ -145,11 +129,11 @@ def delete_movies(id: int) -> dict:
 
     db = Session()
     result = db.query(MovieModel).filter(MovieModel.id == id).first() #Se verifica que el resultado buscado exista.
+    
     if not result:
         return JSONResponse(status_code=404, content={'message': "No encontrado"})
     
-    db.delete(result)   #Con el metodo delete se haya el resultado y se elimina
-    db.commit()
+    MovieService(db).delete_movie(id)
     return JSONResponse(status_code=200, content={"message": "Se ha eliminado la pelicula exitosamente."}) 
 
 """

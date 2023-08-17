@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 from starlette.requests import Request
-from jwt_manager import create_token
+from utils.jwt_manager import create_token
 from config.database import engine, Base 
 
 from middlewares.error_handler import Error_Handler
