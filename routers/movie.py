@@ -11,6 +11,8 @@ from fastapi.encoders import jsonable_encoder
 
 from middlewares.jwt_bearer import JWTBearer
 
+from services.movie import MovieService
+
 movie_router = APIRouter()
 
 
@@ -39,13 +41,13 @@ class Movie(BaseModel):
 @movie_router.get('/movies', tags=['Movies'], response_model=List[Movie], status_code=200, dependencies=[Depends(JWTBearer())])
 def get_movies() -> List[Movie]:
     db = Session()
-    result = db.query(MovieModel).all()
+    result = MovieService(db).get_movies()
     return JSONResponse(status_code=200, content=jsonable_encoder(result))
 
 @movie_router.get('/movies/{id}', tags=['Movies'], response_model=Movie)
 def get_movies_by_id(id: int = Path(ge=1, le=2000)) -> Movie:  ##Se solicita el id (entero) como variable obligatoria
     db = Session()
-    result = db.query(MovieModel).filter(MovieModel.id == id).first()
+    result = MovieService(db).get_movie(id)
     
     if not result:
         return JSONResponse(status_code=404, content={'message': "No encontrado"})
@@ -61,7 +63,7 @@ def get_movies_by_id(id: int = Path(ge=1, le=2000)) -> Movie:  ##Se solicita el 
 def get_movies_by_category(category: str = Query(min_length=3, max_length=15), year: str = Query(min_length=1, max_length=5)) -> List[Movie]:   #En este caso se filtra por categoria y por año, ambas obligatorias
     #return [ item for item in movies if item['category'] == category ]  ##Using list comprhensions
     db = Session()
-    result = db.query(MovieModel).filter(MovieModel.category == category and MovieModel.year == year).all()
+    result = MovieService(db).get_movie_category(category,year)
 
     if not result:
         return JSONResponse(status_code=404, content={'message': "No encontrado"})

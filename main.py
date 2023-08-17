@@ -8,6 +8,7 @@ from config.database import engine, Base
 
 from middlewares.error_handler import Error_Handler
 from routers.movie import movie_router
+from routers.user import user_router
 
 app = FastAPI()
 app.title = "Mi aplicacion con FastAPI"
@@ -15,13 +16,9 @@ app.version = "0.0.3"
 
 app.add_middleware(Error_Handler)   #Se linkea el error handler creado anteriormente.
 app.include_router(movie_router)    #Se linkea el router con los metodos relacionados con Movies.
+app.include_router(user_router)     #Se linkea el router con el metodo post en User.
 
 Base.metadata.create_all(bind= engine)
-
-class User(BaseModel):
-    email: str
-    password: str
-
 
 movies = [
     {
@@ -46,8 +43,3 @@ movies = [
 def message():
     return HTMLResponse('<h1>Hello World</h1>')
 
-@app.post('/login', tags=['auth'])  #Se crea path en donde se ejecutará el login/token
-def login(user: User):
-    if user.email == "admin@gmail.com" and user.password == "admin":    #Habiendo definido las credenciales
-        token:str = create_token(user.dict()) #Se llama a la funcion "create_token" y el servidor nos contesta con el token
-        return JSONResponse(status_code=200, content=token)
